@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>RSA Client-Side Example</title>
+</head>
+
+<body>
+  <input type="text" id="data-to-encrypt">
+  <button onclick="encryptData()">Encrypt</button>
+  <p id="encrypted-data"></p>
+  <button onclick="decryptData()">Decrypt</button>
+
+  <p id="decrypted-data"></p>
+
+  <script>
+    let keyPair; // Global variable to store the key pair
+
+    function generateKeyPair() {
+      return window.crypto.subtle.generateKey({
+        name: "RSA-OAEP",
+        modulusLength: 2048,
+        publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
+        hash: "SHA-256",
+      }, true, ["encrypt", "decrypt"])
+        .then(kp => {
+          keyPair = kp;
+            exportKey(kp.publicKey, "spki"),
+            exportKey(kp.privateKey, "pkcs8")
+          return kp;
+        });
+    }
+
+    function exportKey(key, format) {
+      return window.crypto.subtle.exportKey(format, key)
+        .then(rawKeyData => {
+          const exportedKeyBase64 = btoa(String.fromCharCode(...new Uint8Array(rawKeyData)));
+          console.log(`Exported ${key.type} key (Base64):`, exportedKeyBase64 , "End of Public and Private Key");
+        });
+    }
+
+    function encryptData() {
+      generateKeyPair()
+        .then(kp => {
+          keyPair = kp; // Store the key pair for later use
+          const dataToEncrypt = document.getElementById("data-to-encrypt").value;
+          window.crypto.subtle.encrypt({
+            name: "RSA-OAEP"
+          }, keyPair.publicKey, new TextEncoder().encode(dataToEncrypt))
+            .then(encryptedData => {
+              const encryptedDataAsBase64 = btoa(String.fromCharCode(...new Uint8Array(encryptedData)));
+              document.getElementById("encrypted-data").textContent = encryptedDataAsBase64;
+            })
+            .catch(error => console.error("Encryption error:", error));
+        })
+        .catch(error => console.error("Key generation error:", error));
+    }
+
+    function decryptData() {
+      if (!keyPair) {
+        console.error("No key pair available for decryption.");
+        return;
+      }
+      exportKey(keyPair.privateKey, "pkcs8")
+
+      const encryptedDataAsBase64 = document.getElementById("encrypted-data").textContent;
+      const encryptedData = atob(encryptedDataAsBase64);
+      const encryptedDataArrayBuffer = new Uint8Array(encryptedData.split("").map(char => char.charCodeAt(0)));
+
+      window.crypto.subtle.decrypt({
+        name: "RSA-OAEP"
+      }, keyPair.privateKey, encryptedDataArrayBuffer)
+        .then(decryptedData => {
+          const decryptedText = new TextDecoder().decode(decryptedData);
+          console.log("Decrypted text:", decryptedText); // Display or use the decrypted text
+          document.getElementById("decrypted-data").textContent = decryptedText;
+        })
+        .catch(error => console.error("Decryption error:", error));
+    }
+  </script>
+</body>
+
+</html>
